@@ -3,7 +3,7 @@ using Cribbage.Core.Models;
 
 namespace Cribbage.Core.Scoring;
 
-public static class HandScoreCalculator
+public static class ScoreCalculator
 {
   public static int CalculateScore(IEnumerable<CardCombination> combinations) => combinations.Sum(c => c.CalculateScore());
 }

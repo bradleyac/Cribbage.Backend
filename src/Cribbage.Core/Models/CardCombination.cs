@@ -7,6 +7,7 @@ public sealed record CardCombination(CombinationType Type, Card[] Cards) : IEqua
   public int CalculateScore() => Type switch
   {
     CombinationType.Fifteen => 2,
+    CombinationType.ThirtyOne => 2,
     CombinationType.Pair => 2,
     CombinationType.ThreeOfAKind => 6,
     CombinationType.FourOfAKind => 12,
@@ -46,6 +47,7 @@ public enum CombinationType
   FourOfAKind,
   Run,
   Fifteen,
+  ThirtyOne,
   Flush,
-  Nobs
+  Nobs,
 }

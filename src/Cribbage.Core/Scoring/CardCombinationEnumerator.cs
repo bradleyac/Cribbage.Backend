@@ -8,53 +8,35 @@ public static class CardCombinationEnumerator
 {
   public static IEnumerable<CardCombination> GetCardCombinations(Hand hand, Card starter)
   {
-    List<CardCombination> combinations = new();
+    List<CardCombination> combinations = [];
 
     Card[] sortedAllCards = hand.Cards.Append(starter).OrderBy(card => card.Rank).ThenBy(card => card.Suit).ToArray();
+    Card[][] sortedAllCombinations = GetAllCombinationsOfCards(sortedAllCards).ToArray();
 
     combinations.AddRange(GetPairs(sortedAllCards));
-    combinations.AddRange(GetFifteens(sortedAllCards));
+    combinations.AddRange(GetFifteens(sortedAllCombinations));
     combinations.AddRange(GetFlushes(hand, starter, sortedAllCards));
-    combinations.AddRange(GetRuns(sortedAllCards));
+    combinations.AddRange(GetRuns(sortedAllCombinations));
     combinations.AddRange(GetNobs(hand, starter));
 
     return combinations;
 
-    static IEnumerable<CardCombination> GetNobs(Hand hand, Card starter)
-    {
-      return hand.Cards.FirstOrDefault(c => c.Rank == Rank.Jack && c.Suit == starter.Suit) is Card c ? [new CardCombination(CombinationType.Nobs, [c])] : [];
-    }
+    static IEnumerable<CardCombination> GetNobs(Hand hand, Card starter) => hand.Cards.FirstOrDefault(c => c.Rank == Rank.Jack && c.Suit == starter.Suit) is Card c
+      ? [new CardCombination(CombinationType.Nobs, [c])]
+      : [];
 
-    static IEnumerable<CardCombination> GetRuns(Card[] sortedAllCards)
-    {
-      return GetAllCombinationsOfCards(sortedAllCards)
+    static IEnumerable<CardCombination> GetRuns(Card[][] sortedAllCombinations) => sortedAllCombinations
             .Where(combo => combo.Length >= 3)
-            .Where(IsRun)
+            .Where(Utils.IsRun)
             .GroupBy(c => c.Length)
             .OrderByDescending(g => g.Key)
             .FirstOrDefault()?
             .Select(c => new CardCombination(CombinationType.Run, c)) ?? [];
 
-      static bool IsRun(Card[] combo)
-      {
-        for (int i = 1; i < combo.Length; i++)
-        {
-          if ((int)combo[i].Rank != (int)combo[i - 1].Rank + 1)
-          {
-            return false;
-          }
-        }
-        return true;
-      }
-    }
-
-    static IEnumerable<CardCombination> GetFifteens(Card[] allCards)
-    {
-      return GetAllCombinationsOfCards(allCards)
+    static IEnumerable<CardCombination> GetFifteens(Card[][] sortedAllCombinations) => sortedAllCombinations
             .GroupBy(c => c.Sum(card => Math.Min(10, (int)card.Rank)))
             .Where(g => g.Key == 15)
             .SelectMany(g => g.Select(combo => new CardCombination(CombinationType.Fifteen, combo)));
-    }
 
     static IEnumerable<CardCombination> GetFlushes(Hand hand, Card starter, Card[] sortedAllCards)
     {
@@ -83,22 +65,12 @@ public static class CardCombinationEnumerator
     }
   }
 
-  private static IEnumerable<Card[]> GetAllCombinationsOfCards(Card[] cards)
-  {
-    int n = cards.Length;
-    int combinationCount = 1 << n; // 2^n combinations
+  private static IEnumerable<Card[]> GetAllCombinationsOfCards(Card[] cards) => GetAllCombinationsOfCards([], cards);
 
-    for (int i = 1; i < combinationCount; i++)
-    {
-      List<Card> combination = new();
-      for (int j = 0; j < n; j++)
-      {
-        if ((i & (1 << j)) != 0)
-        {
-          combination.Add(cards[j]);
-        }
-      }
-      yield return combination.ToArray();
-    }
-  }
+  private static IEnumerable<Card[]> GetAllCombinationsOfCards(Card[] acc, Card[] cards) => cards.Length switch
+  {
+    0 => [acc],
+    _ => GetAllCombinationsOfCards([.. acc, cards[0]], cards[1..])
+      .Concat(GetAllCombinationsOfCards(acc, cards[1..]))
+  };
 }
