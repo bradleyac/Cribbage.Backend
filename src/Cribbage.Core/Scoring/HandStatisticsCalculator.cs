@@ -8,9 +8,18 @@ namespace Cribbage.Core.Scoring;
 
 public static class HandStatisticsCalculator
 {
-  public record HandStatistics(int LowHandScore, int HighHandScore, int LowCribScore, int HighCribScore, double AverageTotalScore);
+  public record HandStatistics(int LowHandScore, int HighHandScore, double AverageHandScore, double AverageCribScore) : IEquatable<HandStatistics>
+  {
+    public virtual bool Equals(HandStatistics? other) => other is not null &&
+      LowHandScore == other.LowHandScore &&
+      HighHandScore == other.HighHandScore &&
+      Math.Abs(AverageHandScore - other.AverageHandScore) < 0.01 &&
+      Math.Abs(AverageCribScore - other.AverageCribScore) < 0.01;
 
-  public static HandStatistics CalculateHandStatistics(Card[] hand, Card[] discards, bool ownsCrib)
+    public override int GetHashCode() => HashCode.Combine(LowHandScore, HighHandScore, Math.Round(AverageHandScore, 1), Math.Round(AverageCribScore, 1));
+  };
+
+  public static HandStatistics CalculateHandStatistics(Card[] hand, Card[] discards)
   {
     var remainingDeck = Utils.GetComplement([.. hand, .. discards]);
 
@@ -18,8 +27,6 @@ public static class HandStatisticsCalculator
     int lowHandScore = int.MaxValue;
     int highHandScore = 0;
     int totalCribScore = 0;
-    int lowCribScore = int.MaxValue;
-    int highCribScore = 0;
 
     for (int i = 0; i < remainingDeck.Length; i++)
     {
@@ -31,12 +38,13 @@ public static class HandStatisticsCalculator
       if (handScore > highHandScore) highHandScore = handScore;
       totalHandScore += handScore;
 
-      var allPossibleRemainingCribCards = Utils.NChooseC(rest, 2).ToArray();
-      foreach (var cribCards in allPossibleRemainingCribCards)
+      foreach (var cribCards in Utils.NChooseC(rest, 2))
       {
-        var cribScore = ScoreCalculator.CalculateScore(CardCombinationEnumerator.GetCardCombinations(new Hand([.. discards, .. cribCards], IsCrib: true), cutCard));
-        if (cribScore < lowCribScore) lowCribScore = cribScore;
-        if (cribScore > highCribScore) highCribScore = cribScore;
+        var cribHand = new Hand([.. discards, .. cribCards], IsCrib: true);
+        var cribScore = ScoreCalculator.CalculateScore(CardCombinationEnumerator.GetCardCombinations(cribHand, cutCard));
+
+        var sorted = cribHand.Cards.OrderBy(c => c.Rank).ThenBy(c => c.Suit).ToArray();
+
         totalCribScore += cribScore;
       }
     }
@@ -44,15 +52,32 @@ public static class HandStatisticsCalculator
     int numberOfHands = remainingDeck.Length;
     int numberOfCribs = numberOfHands * (remainingDeck.Length - 1) * (remainingDeck.Length - 2) / 2;
 
-    Debug.WriteLine($"Number of hands: {numberOfHands}, Number of cribs: {numberOfCribs}");
-    Debug.WriteLine($"Total hand score: {totalHandScore}, Total crib score: {totalCribScore}");
-
     return new HandStatistics(
       LowHandScore: lowHandScore,
       HighHandScore: highHandScore,
-      LowCribScore: lowCribScore,
-      HighCribScore: highCribScore,
-      AverageTotalScore: totalHandScore / (double)numberOfHands + (ownsCrib ? 1 : -1) * totalCribScore / (double)numberOfCribs
+      AverageHandScore: totalHandScore / (double)numberOfHands,
+      AverageCribScore: totalCribScore / (double)numberOfCribs
     );
+  }
+
+  public static List<(Hand, Card, int)> GetCribsAndScores(Card[] hand, Card[] discards)
+  {
+    var ret = new List<(Hand, Card, int)>();
+    var remainingDeck = Utils.GetComplement([.. hand, .. discards]);
+
+    for (int i = 0; i < remainingDeck.Length; i++)
+    {
+      var cutCard = remainingDeck[i];
+      var rest = remainingDeck.Except([cutCard]).ToArray();
+
+      foreach (var cribCards in Utils.NChooseC(rest, 2))
+      {
+        var cribHand = new Hand([.. discards, .. cribCards], IsCrib: true);
+        var cribScore = ScoreCalculator.CalculateScore(CardCombinationEnumerator.GetCardCombinations(cribHand, cutCard));
+        ret.Add((cribHand, cutCard, cribScore));
+      }
+    }
+
+    return ret;
   }
 }

@@ -2,7 +2,7 @@ namespace Cribbage.Core.Models;
 
 public record Card(Suit Suit, Rank Rank)
 {
-  public override string ToString() => $"{Rank} of {Suit}";
+  public override string ToString() => $"{(Rank > Rank.Ace && Rank < Rank.Jack ? ((int)Rank).ToString() : Rank.ToString().First())}{Suit.ToString().First()}";
 }
 
 public enum Suit
